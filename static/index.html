@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Upload unit and assessment briefs and validate an extracted course schedule.">
+    <title>IQTERRA Assessment Scheduler</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="primary-nav" id="primaryNav" aria-label="Primary navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">IQ</span>
+          <span class="brand-name">TERRA</span>
+          <span class="brand-arrow" aria-hidden="true">››</span>
+          <small>AI · DATA · AUTOMATION · EDUCATION</small>
+        </div>
+
+        <div class="project-card">
+          <span class="nav-icon">▣</span>
+          <div><strong>Assessment scheduler</strong><small>MBAI programme</small></div>
+        </div>
+
+        <div class="nav-status">
+          <span class="avatar">AS</span>
+          <div><strong>Local workspace</strong><small>Private processing</small></div>
+        </div>
+      </aside>
+
+      <div class="content-shell">
+        <header class="topbar">
+          <button class="menu-button" id="menuButton" aria-label="Toggle navigation">☰</button>
+          <div class="breadcrumb"><strong>Assessment Scheduler</strong><span>/</span><span>MBAI coursework</span></div>
+          <div class="topbar-actions">
+            <label class="select-wrap">
+              <span class="sr-only">Extraction method</span>
+              <select id="extractionMethod">
+                <option value="rule-based">Rule-based extraction</option>
+                <option value="ollama">Ollama + Gemma 4</option>
+              </select>
+            </label>
+            <span class="status-pill"><i></i><span id="appStatus">Ready</span></span>
+          </div>
+        </header>
+
+        <div class="workspace-grid">
+          <aside class="section-nav" aria-label="Page sections">
+            <div class="section-nav-head">
+              <span>Sections</span>
+              <input id="sectionFilter" type="search" placeholder="Filter sections…" aria-label="Filter page sections">
+            </div>
+            <nav id="sectionLinks">
+              <a class="active" href="#unit-upload">Unit Outline Upload</a>
+              <a href="#unit-information">Extracted Unit Information</a>
+              <a href="#assessment-upload">Additional Assessment Briefs</a>
+              <a href="#extracted-assessments">Extracted Assessments</a>
+              <a href="#learning-sequence">Topic Coverage</a>
+              <a href="#weekly-schedule">Draft Schedule</a>
+              <a href="#validation">Schedule Validation</a>
+              <a href="#optimization">Optimise Schedule</a>
+              <a href="#academic-review">Academic Review</a>
+              <a href="#publish">Publish Final Schedule</a>
+            </nav>
+            <div class="section-actions">
+              <button id="exportButton" class="secondary-button" disabled>Export JSON</button>
+              <button id="clearButton" class="danger-button" disabled>Clear schedule</button>
+            </div>
+          </aside>
+
+          <main class="main-workspace" id="mainWorkspace">
+            <section id="unit-upload" class="content-section">
+              <div class="section-heading">
+                <div><span class="eyebrow">STEP 1</span><h1>Upload the unit outlines</h1><p>The outlines establish the teaching sequence and scheduling context.</p></div>
+                <span class="course-badge" id="courseDurationBadge">Course length from outline</span>
+              </div>
+              <label class="drop-zone" id="unitDropZone" for="unitFileInput">
+                <input id="unitFileInput" type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" multiple>
+                <span class="upload-symbol unit-symbol" aria-hidden="true">01</span>
+                <strong>Drop unit outline files here</strong>
+                <span>or click to browse from your computer</span>
+                <small>PDF or DOCX · Up to 30 MB combined</small>
+              </label>
+              <div id="unitFileList" class="file-list" aria-live="polite"></div>
+              <div class="file-list-actions">
+                <button id="addUnitFileButton" class="secondary-button" type="button">+ Add another file</button>
+              </div>
+              <div class="generate-row">
+                <p id="unitUploadHint">Upload one or more unit outlines to begin.</p>
+                <div class="generation-control">
+                  <span id="unitGenerationTimer" class="generation-timer" aria-live="polite" hidden>Elapsed: 0.0s</span>
+                  <button id="extractUnitButton" class="primary-button" disabled><span>Extract unit information</span><b aria-hidden="true">→</b></button>
+                </div>
+              </div>
+              <div id="unitMessageArea" class="message-area" aria-live="polite"></div>
+
+              <div class="ollama-settings" id="ollamaSettings" hidden>
+                <div class="setting-field"><label for="ollamaHost">Ollama host</label><input id="ollamaHost" value="http://localhost:11434"></div>
+                <div class="setting-field"><label for="ollamaModel">Model</label><input id="ollamaModel" value="gemma4"></div>
+                <button id="checkOllamaButton" class="secondary-button">Check connection</button>
+                <span id="ollamaStatus" class="inline-status"></span>
+              </div>
+            </section>
+
+            <section id="unit-information" class="content-section unit-results-section" hidden>
+              <div class="section-heading compact">
+                <div><span class="eyebrow">STEP 2</span><h2>Extracted unit information</h2><p>Confirm the teaching pattern and review the generated session plan before adding assessments.</p></div>
+                <button id="printUnitButton" class="secondary-button">Print unit information</button>
+              </div>
+              <div id="unitSelectorPanel" class="unit-selector-panel" hidden>
+                <div><strong>Unit / subject</strong><small>Select a code to review its extracted information.</small></div>
+                <select id="unitSelector" aria-label="Select unit or subject"></select>
+              </div>
+              <div class="unit-identity-grid">
+                <div class="setting-field"><label for="unitCode">Unit code</label><input id="unitCode" placeholder="Not found"></div>
+                <div class="setting-field grow"><label for="unitName">Unit name</label><input id="unitName" placeholder="Not found"></div>
+                <div class="setting-field"><label for="numberOfSessions">Number of sessions</label><input id="numberOfSessions" type="number" min="0" readonly></div>
+              </div>
+              <div class="unit-detail-grid">
+                <article class="unit-detail-card wide"><h3>Learning outcomes</h3><textarea id="learningOutcomes" rows="7" placeholder="No learning outcomes found"></textarea></article>
+              </div>
+              <div class="weekly-topic-panel assessment-information-panel">
+                <div class="panel-title"><div><h3>Assessment information</h3><small>Due weeks are converted to the last teaching session in that week using the delivery pattern below.</small></div><button id="addAssessmentInformationButton" class="secondary-button" type="button">+ Add assessment</button></div>
+                <div class="table-wrap"><table class="data-table topics-table assessment-information-table"><thead><tr><th>Assessment</th><th>Information</th><th>Due after session</th><th></th></tr></thead><tbody id="assessmentInformationBody"></tbody></table></div>
+              </div>
+              <div class="weekly-topic-panel">
+                <div class="panel-title"><div><h3>Teaching sessions</h3><small>Review the topic or class focus for each session.</small></div><button id="addSessionButton" class="secondary-button" type="button">+ Add session</button></div>
+                <div class="table-wrap"><table class="data-table topics-table session-plan-table"><thead><tr><th>Session</th><th>Topic / class focus</th><th></th></tr></thead><tbody id="sessionPlanBody"></tbody></table></div>
+              </div>
+              <div class="delivery-choice-panel">
+                <div class="panel-title"><div><h3>Choose the delivery pattern</h3><small>Confirm how the sessions are distributed before generating a weekly draft.</small></div></div>
+                <div class="session-schedule-setup">
+                  <div class="setting-field"><label for="scheduleSessionsPerWeek">Sessions per week</label><input id="scheduleSessionsPerWeek" type="number" min="1" max="10" value="1"></div>
+                  <div id="sessionWeekCalculation" class="session-week-calculation" aria-live="polite"></div>
+                </div>
+                <div class="continue-row"><span id="unitSource"></span><div class="delivery-choice-actions"><button id="continueButton" class="secondary-button" type="button">Add assessment briefs</button><button id="generateFromOutlineButton" class="primary-button" type="button"><span>Generate draft from unit outline</span><b aria-hidden="true">→</b></button></div></div>
+                <div id="outlineDraftMessageArea" class="message-area" aria-live="polite"></div>
+              </div>
+            </section>
+
+            <section id="extracted-assessments" class="content-section results-section" hidden>
+              <div class="section-heading compact">
+                <div><span class="eyebrow">STEP 4</span><h2>Review extracted assessments</h2><p>Review each subject's assessments separately by its unit / subject code.</p></div>
+                <button id="addRowButton" class="secondary-button">+ Add component</button>
+              </div>
+              <div id="assessmentSelectorPanel" class="unit-selector-panel" hidden>
+                <div><strong>Unit / subject</strong><small>Select a code to review its extracted assessments.</small></div>
+                <select id="assessmentSelector" aria-label="Select assessment unit or subject"></select>
+              </div>
+              <div class="metrics-grid" id="metricsGrid"></div>
+              <div class="table-wrap">
+                <table class="data-table editable-table">
+                  <thead><tr><th>Assessment</th><th>Type</th><th>Weight</th><th>Due after session</th><th>Source</th><th></th></tr></thead>
+                  <tbody id="assessmentTableBody"></tbody>
+                </table>
+              </div>
+              <div class="table-footer"><span>Changes automatically refresh the schedule.</span><button id="refreshButton" class="secondary-button">Refresh analysis</button></div>
+              <div class="weekly-topic-panel step4-draft-panel" id="step4DraftPanel">
+                <div class="panel-title"><div><h3>Draft weekly schedule</h3><small>This initial table uses the assessment information available in the unit outline.</small></div><div class="schedule-heading-actions"><span class="draft-badge">Outline draft</span><button id="step4ScheduleFullscreenButton" class="secondary-button" type="button" aria-pressed="false">Full screen</button></div></div>
+                <div class="schedule-matrix-wrap" role="region" aria-label="Outline assessment schedule by unit and week" tabindex="0">
+                  <table class="schedule-matrix">
+                    <thead id="step4DraftScheduleHead"></thead>
+                    <tbody id="step4DraftScheduleBody"></tbody>
+                  </table>
+                </div>
+                <div id="step4OutsideCourse"></div>
+              </div>
+            </section>
+
+            <section id="assessment-upload" class="content-section assessment-flow-section" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">BEFORE STEP 5</span><h2>Upload additional assessment briefs</h2><p>Add the available PDF or DOCX briefs to generate the detailed topic evaluation in Step 5 and the updated schedule in Step 6.</p></div></div>
+              <label class="drop-zone" id="dropZone" for="fileInput">
+                <input id="fileInput" type="file" accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx" multiple>
+                <span class="upload-symbol" aria-hidden="true">↑</span>
+                <strong>Drop additional assessment briefs here</strong>
+                <span>or click to browse from your computer</span>
+                <small>PDF or DOCX · Up to 30 MB combined</small>
+              </label>
+              <div id="fileList" class="file-list" aria-live="polite"></div>
+              <div class="file-list-actions">
+                <button id="addAssessmentFileButton" class="secondary-button" type="button">+ Add another file</button>
+              </div>
+              <div class="generate-row">
+                <p id="uploadHint">Upload at least one assessment brief to continue to Steps 5 and 6.</p>
+                <button id="generateButton" class="primary-button" disabled><span>Generate Steps 5 and 6</span><b aria-hidden="true">→</b></button>
+              </div>
+              <div id="messageArea" class="message-area" aria-live="polite"></div>
+            </section>
+
+            <section id="learning-sequence" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 5</span><h2>Evaluate required topic coverage</h2><p>Check whether each assessment’s required topics and skills are taught on or before the week derived from its due session.</p></div><span class="flow-chip" id="scaffoldingMethodBadge">Topic coverage evaluation</span></div>
+              <div id="sequenceSelectorPanel" class="unit-selector-panel" hidden>
+                <div><strong>Unit / subject</strong><small>Select a code to review its topic coverage.</small></div>
+                <select id="sequenceSelector" aria-label="Select topic coverage unit or subject"></select>
+              </div>
+              <div id="scaffoldingMessageArea" class="message-area" aria-live="polite"></div>
+              <div id="scaffoldingSummary" class="scaffolding-summary"></div>
+              <div class="table-wrap"><table class="data-table sequence-table"><thead><tr><th>Assessment</th><th>Due</th><th>Required topics & skills</th><th>Learning outcomes assessed</th><th>Topic coverage evaluation</th></tr></thead><tbody id="sequenceTableBody"></tbody></table></div>
+            </section>
+
+            <section id="weekly-schedule" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 6</span><h2 id="draftScheduleTitle">Draft course schedule</h2><p>Assessments are placed in the week containing their selected due session. Summary totals appear at the end; assessments default to Individual unless their type states Group.</p></div><div class="schedule-heading-actions"><span id="scheduleSaveStatus" class="schedule-save-status" aria-live="polite"></span><span class="draft-badge">Draft</span><button id="saveScheduleButton" class="secondary-button" type="button">Save schedule</button><button id="scheduleFullscreenButton" class="secondary-button" type="button" aria-pressed="false">Full screen</button></div></div>
+              <div class="schedule-matrix-wrap" role="region" aria-label="Assessment schedule by unit and week" tabindex="0">
+                <table class="schedule-matrix">
+                  <thead id="scheduleMatrixHead"></thead>
+                  <tbody id="scheduleMatrixBody"></tbody>
+                </table>
+              </div>
+              <div id="outsideCourse"></div>
+            </section>
+
+            <section id="validation" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 7</span><h2>Validate schedule</h2><p>Check workload balance, feedback timing, and learning progression.</p></div><button id="validateButton" class="secondary-button">Run validation</button></div>
+              <div id="validationSelectorPanel" class="unit-selector-panel" hidden>
+                <div><strong>Unit / subject</strong><small>Select a code to review its validation results.</small></div>
+                <select id="validationSelector" aria-label="Select validation unit or subject"></select>
+              </div>
+              <div id="feedbackList" class="feedback-list"></div>
+              <div id="validationDecision" class="decision-banner"></div>
+            </section>
+
+            <section id="optimization" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 8</span><h2>Optimise schedule</h2><p>Move assessments away from invalid or overloaded weeks and add useful buffers.</p></div><button id="optimizeButton" class="primary-button"><span>Optimise draft</span><b aria-hidden="true">↻</b></button></div>
+              <div id="optimizationChanges" class="change-list"><p>No optimisation has been run.</p></div>
+            </section>
+
+            <section id="academic-review" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 9</span><h2>Human / academic review</h2><p>Record the reviewer decision before publication.</p></div></div>
+              <div class="review-grid">
+                <div class="setting-field"><label for="reviewerName">Reviewer</label><input id="reviewerName" placeholder="Academic reviewer name"></div>
+                <div class="setting-field"><label for="reviewDecision">Decision</label><select id="reviewDecision"><option value="">Select decision</option><option value="approved">Approved</option><option value="changes">Changes required</option></select></div>
+                <div class="setting-field review-comments"><label for="reviewComments">Review comments</label><textarea id="reviewComments" rows="5" placeholder="Add approval notes or required changes"></textarea></div>
+              </div>
+              <div class="continue-row"><span id="reviewStatus">Awaiting academic decision.</span><button id="saveReviewButton" class="primary-button"><span>Save review decision</span><b aria-hidden="true">→</b></button></div>
+            </section>
+
+            <section id="publish" class="content-section results-section post-session-setup" hidden>
+              <div class="section-heading compact"><div><span class="eyebrow">STEP 10</span><h2 id="publishScheduleTitle">Publish final course schedule</h2><p>Finalise the approved schedule for distribution.</p></div><span id="publishBadge" class="publish-badge">Awaiting approval</span></div>
+              <div id="publishSummary" class="publish-summary"><p>Academic approval is required before publication.</p></div>
+              <div class="publish-actions"><button id="printScheduleButton" class="secondary-button" disabled>Print schedule</button><button id="publishButton" class="primary-button" disabled><span>Publish final schedule</span><b aria-hidden="true">✓</b></button></div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
