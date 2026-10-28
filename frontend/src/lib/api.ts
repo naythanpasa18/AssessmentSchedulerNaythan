@@ -54,3 +54,24 @@ export async function saveSchedule(payload: object) {
     body: JSON.stringify(payload),
   }))
 }
+
+export async function exportScheduleXml(payload: object) {
+  const response = await fetch('/api/schedules/export.xml', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    let message = `Request failed (${response.status}).`
+    try {
+      const data = await response.json() as { error?: string }
+      message = data.error || message
+    } catch {
+      // Keep the status-based fallback when the server did not return JSON.
+    }
+    throw new Error(message)
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'assessment-weekly-schedule.xml'
+  return { blob: await response.blob(), filename }
+}

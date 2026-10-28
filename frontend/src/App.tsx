@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   CloudUpload,
   Database,
+  Download,
   FileText,
   LoaderCircle,
   Moon,
@@ -42,6 +43,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   analyseSchedule,
+  exportScheduleXml,
   extractUnits,
   generateDraft,
   generateSchedule,
@@ -431,6 +433,27 @@ function App() {
     setMessage({ type: 'success', title: 'Schedule saved', detail: `PostgreSQL snapshot ${data.id} was created.` })
   })
 
+  const exportXml = () => run('Exporting XML', async () => {
+    if (!displayResult || !combinedUnit) return
+    const { blob, filename } = await exportScheduleXml({
+      name: `${combinedUnit.unit_code || 'Assessment'} schedule`,
+      course_duration: displayResult.course_duration,
+      unit_info: combinedUnit,
+      units: preparedUnits,
+      items: displayResult.items,
+      schedule: displayResult.schedule,
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    setMessage({ type: 'success', title: 'XML exported', detail: `${filename} was downloaded.` })
+  })
+
   const toggleTheme = () => {
     setDark((value) => {
       document.documentElement.classList.toggle('dark', !value)
@@ -574,7 +597,7 @@ function App() {
               <CoverageEvaluation items={result.items} evaluations={result.scaffolding} />
             </Section>}
 
-            {activeStep === 'weekly-schedule' && result && <Section id="weekly-schedule" step="6" title="Draft course schedule" description="The weekly matrix places each assessment in the week containing its due session. Assessments default to Individual unless explicitly marked Group." action={<div className="flex flex-wrap items-center gap-2"><span className="max-w-72 truncate text-xs text-muted-foreground">{saved}</span><Button variant="outline" size="sm" onClick={persist} disabled={!!busy}><Database />Save to PostgreSQL</Button></div>}>
+            {activeStep === 'weekly-schedule' && result && <Section id="weekly-schedule" step="6" title="Draft course schedule" description="The weekly matrix places each assessment in the week containing its due session. Assessments default to Individual unless explicitly marked Group." action={<div className="flex flex-wrap items-center gap-2"><span className="max-w-72 truncate text-xs text-muted-foreground">{saved}</span><Button variant="outline" size="sm" onClick={exportXml} disabled={!!busy}><Download />Export XML</Button><Button variant="outline" size="sm" onClick={persist} disabled={!!busy}><Database />Save to PostgreSQL</Button></div>}>
               <SubjectAssessmentTabs items={result.items} onChange={updateItem} />
               <div className="mt-4 flex items-center gap-3 rounded-lg border bg-primary/5 p-3 text-sm"><CalendarDays className="size-5 shrink-0 text-primary" /><span>The weekly schedule updates automatically and is available from the orange button at the bottom-right of the screen.</span></div>
             </Section>}
@@ -614,6 +637,7 @@ function App() {
               <DialogTitle>Weekly assessment schedule</DialogTitle>
               <DialogDescription>{displayResult ? (result ? 'Coverage from Step 5 is shown here: green is covered, orange is partially covered or needs review, and red is not covered.' : 'Red assessments use information from the unit outline because no assessment brief has been provided yet.') : 'Generate an outline draft to populate the weekly schedule.'}</DialogDescription>
             </DialogHeader>
+            {displayResult && <div className="flex justify-end"><Button variant="outline" size="sm" onClick={exportXml} disabled={!!busy}><Download />Export XML</Button></div>}
             <div className="min-h-0 flex-1 overflow-auto">
               {displayResult
                 ? <ScheduleMatrix items={displayResult.items} weeks={displayResult.course_duration} outlineOnly={!result} coverageEvaluations={result?.scaffolding} />

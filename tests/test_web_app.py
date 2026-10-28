@@ -2,6 +2,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch
+from xml.etree import ElementTree as ET
 
 from app import app
 from assessment_scheduler.scaffolding import ScaffoldingEvaluation
@@ -70,6 +71,64 @@ class WebAppTests(unittest.TestCase):
         response = self.client.post("/api/schedules", json={"items": [], "schedule": []})
         self.assertEqual(response.status_code, 400)
         self.assertIn("Generate the Step 6 schedule", response.get_json()["error"])
+
+    def test_weekly_schedule_can_be_exported_as_xml(self) -> None:
+        payload = {
+            "name": "MBAI5001 & MBAI5002 schedule",
+            "course_duration": 2,
+            "unit_info": {
+                "unit_code": "MBAI5001",
+                "weekly_topics": [
+                    {"week": "1", "topic": "Strategy & innovation"},
+                    {"week": "2", "topic": "Implementation"},
+                ],
+            },
+            "units": [
+                {"unit_code": "MBAI5001", "unit_name": "Digital Transformation & Innovation"}
+            ],
+            "items": [
+                {
+                    "subject_code": "MBAI5001",
+                    "subject_name": "Digital Transformation & Innovation",
+                    "assessment_name": "Assessment 1",
+                    "component": "Report",
+                    "assessment_type": "Individual",
+                    "weight": 30,
+                    "due_week": 2,
+                    "due_session": 4,
+                    "required_topics_skills": ["Strategy & analysis"],
+                }
+            ],
+            "schedule": [
+                {"Week": 1, "Assessments due": "-", "Weight due": 0},
+                {"Week": 2, "Assessments due": "Assessment 1", "Weight due": 30},
+            ],
+        }
+
+        response = self.client.post("/api/schedules/export.xml", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/xml")
+        self.assertIn(
+            'filename="MBAI5001-weekly-schedule.xml"',
+            response.headers["Content-Disposition"],
+        )
+        root = ET.fromstring(response.data)
+        self.assertEqual(root.tag, "assessmentSchedule")
+        self.assertEqual(root.findtext("name"), "MBAI5001 & MBAI5002 schedule")
+        week = root.find("./weeks/week[@number='2']")
+        self.assertIsNotNone(week)
+        self.assertEqual(week.findtext("summary/weightDue"), "30")
+        self.assertEqual(week.findtext("assessments/assessment/assessmentName"), "Assessment 1")
+        self.assertEqual(
+            week.findtext("assessments/assessment/requiredTopicsSkills/requirement"),
+            "Strategy & analysis",
+        )
+
+    def test_weekly_schedule_export_requires_generated_data(self) -> None:
+        response = self.client.post("/api/schedules/export.xml", json={"items": [], "schedule": []})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Generate the weekly schedule", response.get_json()["error"])
 
     @patch("app.save_schedule_snapshot")
     def test_step_6_save_reports_missing_database_configuration(self, save_snapshot) -> None:

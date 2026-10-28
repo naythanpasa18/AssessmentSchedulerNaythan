@@ -171,6 +171,7 @@ function resetAssessmentWorkflow(clearFiles = true) {
   markScheduleUnsaved();
   $$(".results-section").forEach((section) => { section.hidden = true; });
   $("#exportButton").disabled = true;
+  $("#exportXmlButton").disabled = true;
   $("#clearButton").disabled = true;
   if (clearFiles) {
     state.sessionsPerWeek = 0;
@@ -787,6 +788,7 @@ function updateResults(data, assessmentBriefsProcessed = state.assessmentBriefsP
     section.hidden = !state.sessionScheduleConfirmed || !state.assessmentBriefsProcessed;
   });
   $("#exportButton").disabled = false;
+  $("#exportXmlButton").disabled = false;
   $("#clearButton").disabled = false;
   renderAllResults();
   renderSessionScheduleSetup();
@@ -1562,6 +1564,38 @@ $("#exportButton").addEventListener("click", () => {
   link.download = "assessment-scheduling-workflow.json";
   link.click();
   URL.revokeObjectURL(link.href);
+});
+
+$("#exportXmlButton").addEventListener("click", async () => {
+  const payload = {
+    name: `${state.unitInfo?.unit_code || "Assessment"} schedule`,
+    course_duration: state.courseDuration,
+    unit_info: state.unitInfo,
+    units: state.units,
+    items: state.items,
+    schedule: state.schedule,
+  };
+  try {
+    const response = await fetch("/api/schedules/export.xml", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Request failed (${response.status}).`);
+    }
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "assessment-weekly-schedule.xml";
+    const blob = await response.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (error) {
+    showMessages("#messageArea", [error.message], "error");
+  }
 });
 
 $("#sectionFilter").addEventListener("input", (event) => {

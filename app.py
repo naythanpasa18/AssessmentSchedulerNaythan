@@ -34,6 +34,7 @@ from assessment_scheduler.unit_outline_ingestion import (
     parse_unit_outline_text,
     parse_unit_outline_text_with_ollama,
 )
+from assessment_scheduler.xml_export import schedule_to_xml, schedule_xml_filename
 
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -436,6 +437,35 @@ def save_generated_schedule():
     except (DatabaseConfigurationError, DatabaseOperationError) as exc:
         return jsonify({"error": str(exc)}), 503
     return jsonify(saved), 201
+
+
+@app.post("/api/schedules/export.xml")
+def export_generated_schedule_xml():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "A JSON schedule snapshot is required."}), 400
+
+    items = payload.get("items", [])
+    schedule = payload.get("schedule", [])
+    if not isinstance(items, list) or not items or not isinstance(schedule, list) or not schedule:
+        return jsonify({"error": "Generate the weekly schedule before exporting it."}), 400
+
+    try:
+        course_duration = int(payload.get("course_duration", len(schedule)))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Course duration must be a whole number."}), 400
+    if not 1 <= course_duration <= 52:
+        return jsonify({"error": "Course duration must be between 1 and 52 weeks."}), 400
+
+    export_payload = {**payload, "course_duration": course_duration}
+    xml = schedule_to_xml(export_payload)
+    return app.response_class(
+        xml,
+        mimetype="application/xml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{schedule_xml_filename(export_payload)}"'
+        },
+    )
 
 
 @app.post("/api/unit-outline")
